@@ -10,7 +10,8 @@ interface PublicShellProps {
 
 const NAV_LINKS = [
   { href: "/#features", label: "Features" },
-  { href: "/privacy", label: "Privacy Policy" },
+  { href: "/#solutions", label: "Solutions" },
+  { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },
   { href: "/contact", label: "Contact" },
 ];
@@ -20,30 +21,30 @@ export function PublicShell({
   isAuthenticated = false,
 }: PublicShellProps) {
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <header className="sticky top-0 z-30 border-b border-border/80 bg-background/85 backdrop-blur-md">
+    <div className="flex min-h-screen flex-col bg-[#071426] text-white">
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#071426]/95 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2.5">
             <BrandLogo className="h-8 w-8" />
-            <div className="flex items-center gap-2">
-              <span className="text-base font-bold tracking-tight text-foreground">
-                ChatStack
+            <div className="flex flex-col leading-none">
+              <span className="text-base font-extrabold tracking-wide text-white">
+                CHATSTACK
               </span>
-              <span className="hidden rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400 sm:inline-flex">
-                WhatsApp CRM
+              <span className="text-[10px] font-medium tracking-wider text-emerald-400">
+                WHATSAPP CRM
               </span>
             </div>
           </Link>
 
           <nav
             aria-label="Public navigation"
-            className="hidden items-center gap-6 text-sm text-muted-foreground md:flex"
+            className="hidden items-center gap-7 text-sm font-medium text-slate-300 md:flex"
           >
             {NAV_LINKS.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="transition-colors hover:text-foreground"
+                className="transition-colors hover:text-white"
               >
                 {item.label}
               </Link>
@@ -54,7 +55,7 @@ export function PublicShell({
             {isAuthenticated ? (
               <Link
                 href="/dashboard"
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 text-sm font-medium text-white transition-colors hover:bg-emerald-500"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#22c55e] px-5 text-sm font-semibold text-[#04180c] shadow-lg shadow-emerald-500/20 transition-colors hover:bg-[#16a34a] hover:text-white"
               >
                 Open Dashboard
                 <ArrowRight className="h-4 w-4" />
@@ -63,16 +64,15 @@ export function PublicShell({
               <>
                 <Link
                   href="/login"
-                  className="inline-flex h-9 items-center rounded-lg border border-border bg-card px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                  className="inline-flex h-9 items-center rounded-full border border-white/25 bg-white/5 px-5 text-sm font-medium text-white transition-colors hover:border-white/40 hover:bg-white/10"
                 >
-                  Sign in
+                  Login
                 </Link>
                 <Link
                   href="/signup"
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-sm font-medium text-white transition-colors hover:bg-emerald-500"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#22c55e] px-5 text-sm font-semibold text-[#04180c] shadow-lg shadow-emerald-500/20 transition-colors hover:bg-[#16a34a] hover:text-white"
                 >
-                  Get Started
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  Get Started Free
                 </Link>
               </>
             )}
@@ -80,48 +80,52 @@ export function PublicShell({
         </div>
       </header>
 
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 bg-background text-foreground">{children}</main>
 
-      <footer className="border-t border-border bg-card/40">
+      <footer className="border-t border-white/10 bg-[#050f1d] text-slate-300">
         <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
           <div className="flex flex-col justify-between gap-8 md:flex-row md:items-center">
             <div className="max-w-sm">
               <Link href="/" className="flex items-center gap-2.5">
                 <BrandLogo className="h-7 w-7" />
-                <span className="text-sm font-semibold text-foreground">
+                <span className="text-sm font-bold tracking-wide text-white">
                   ChatStack WhatsApp CRM
                 </span>
               </Link>
-              <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
-                Unified WhatsApp Business Cloud API workspace for shared team
-                inbox, customer pipelines, broadcasts, and workflow automations.
+              <p className="mt-2.5 text-xs leading-relaxed text-slate-400">
+                Official Meta WhatsApp Business Cloud API workspace for shared
+                team inbox, bulk template broadcasts, sales pipelines, and
+                AI-assisted automations.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-              <Link href="/" className="hover:text-foreground">
+            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-300">
+              <Link href="/" className="hover:text-white">
                 Home
               </Link>
-              <Link href="/login" className="hover:text-foreground">
-                Sign in
+              <Link href="/login" className="hover:text-white">
+                Login
               </Link>
-              <Link href="/signup" className="hover:text-foreground">
-                Create account
+              <Link href="/signup" className="hover:text-white">
+                Get Started Free
               </Link>
-              <Link href="/privacy" className="hover:text-foreground">
+              <Link href="/privacy" className="hover:text-white">
                 Privacy Policy
               </Link>
-              <Link href="/terms" className="hover:text-foreground">
+              <Link href="/terms" className="hover:text-white">
                 Terms of Service
               </Link>
-              <Link href="/contact" className="hover:text-foreground">
+              <Link href="/contact" className="hover:text-white">
                 Contact
               </Link>
             </div>
           </div>
 
-          <div className="mt-8 flex flex-col justify-between gap-2 border-t border-border/60 pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center">
-            <p>© {new Date().getFullYear()} ChatStack WhatsApp CRM (chatstack.cloud). All rights reserved.</p>
+          <div className="mt-8 flex flex-col justify-between gap-2 border-t border-white/10 pt-6 text-xs text-slate-400 sm:flex-row sm:items-center">
+            <p>
+              © {new Date().getFullYear()} ChatStack WhatsApp CRM
+              (chatstack.cloud). All rights reserved.
+            </p>
             <p>Support: noreply@chatstack.cloud</p>
           </div>
         </div>
