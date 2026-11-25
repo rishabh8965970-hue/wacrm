@@ -1,13 +1,5 @@
 import { ImageResponse } from "next/og";
 
-// Replaces the default Next.js favicon with the brand mark — Hostinger
-// violet rounded square + white chat-square glyph — matching the
-// sidebar logo in `src/components/layout/sidebar.tsx`. Next.js renders
-// this at build time and auto-injects <link rel="icon"> into <head>.
-//
-// This route takes precedence over src/app/favicon.ico, which is the
-// Next.js default and can stay on disk harmlessly (or be removed).
-
 export const runtime = "edge";
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
@@ -22,21 +14,37 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#7c3aed", // primary (Hostinger-aligned purple)
-          borderRadius: 6,
+          background: "linear-gradient(135deg, #10b981 0%, #0d9488 100%)",
+          borderRadius: 8,
         }}
       >
         <svg
-          width="20"
-          height="20"
+          width="24"
+          height="24"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#ffffff"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          xmlns="http://www.w3.org/2000/svg"
         >
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          <rect
+            x="8.5"
+            y="4"
+            width="11"
+            height="8.5"
+            rx="2.5"
+            fill="#ffffff"
+            fillOpacity="0.35"
+          />
+          <path
+            d="M5.5 7.5C5.5 6.4 6.4 5.5 7.5 5.5H16.5C17.6 5.5 18.5 6.4 18.5 7.5V14.5C18.5 15.6 17.6 16.5 16.5 16.5H9.3L6 19.2C5.7 19.45 5.5 19.25 5.5 18.9V7.5Z"
+            fill="#ffffff"
+          />
+          <path
+            d="M9 11.2L10.8 13L15 9"
+            stroke="#059669"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </div>
     ),
