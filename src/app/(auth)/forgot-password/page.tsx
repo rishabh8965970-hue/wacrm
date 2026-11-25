@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { CheckCircle, ArrowLeft } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import { AuthShell } from "@/components/auth/auth-shell";
 
 export default function ForgotPasswordPage() {
   const t = useTranslations("ForgotPasswordPage");
@@ -51,8 +52,8 @@ export default function ForgotPasswordPage() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md border-border bg-card">
+      <AuthShell>
+        <Card className="w-full max-w-md border-border bg-card shadow-lg shadow-black/15">
           <CardHeader className="items-center text-center">
             <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
               <CheckCircle className="h-6 w-6 text-primary" />
@@ -80,13 +81,13 @@ export default function ForgotPasswordPage() {
             </Link>
           </CardContent>
         </Card>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md border-border bg-card">
+    <AuthShell>
+      <Card className="w-full max-w-md border-border bg-card shadow-lg shadow-black/15">
         <CardHeader className="items-center text-center">
           <BrandLogo className="mb-2 h-12 w-12" />
           <CardTitle className="text-xl text-foreground">{t("title")}</CardTitle>
@@ -135,6 +136,6 @@ export default function ForgotPasswordPage() {
           </Link>
         </CardContent>
       </Card>
-    </div>
+    </AuthShell>
   );
 }
