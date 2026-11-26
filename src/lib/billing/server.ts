@@ -171,7 +171,7 @@ export async function activateAccountPlan(params: {
   const durationDays = params.days ?? 30;
   const end = new Date(now.getTime() + durationDays * 86_400_000);
 
-  const payload =
+  const payload: Record<string, string | null> =
     params.planId === 'trial'
       ? {
           account_id: params.accountId,
