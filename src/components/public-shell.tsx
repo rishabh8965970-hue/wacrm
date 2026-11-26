@@ -11,6 +11,7 @@ interface PublicShellProps {
 const NAV_LINKS = [
   { href: "/#features", label: "Features" },
   { href: "/#solutions", label: "Solutions" },
+  { href: "/pricing", label: "Pricing" },
   { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },
   { href: "/contact", label: "Contact" },
@@ -38,7 +39,7 @@ export function PublicShell({
 
           <nav
             aria-label="Public navigation"
-            className="hidden items-center gap-7 text-sm font-medium text-slate-300 md:flex"
+            className="hidden items-center gap-6 text-sm font-medium text-slate-300 md:flex"
           >
             {NAV_LINKS.map((item) => (
               <Link
@@ -80,7 +81,7 @@ export function PublicShell({
         </div>
       </header>
 
-      <main className="flex-1 bg-background text-foreground">{children}</main>
+      <main className="flex-1 bg-white text-slate-900">{children}</main>
 
       <footer className="border-t border-white/10 bg-[#050f1d] text-slate-300">
         <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -102,6 +103,9 @@ export function PublicShell({
             <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-300">
               <Link href="/" className="hover:text-white">
                 Home
+              </Link>
+              <Link href="/pricing" className="hover:text-white">
+                Pricing
               </Link>
               <Link href="/login" className="hover:text-white">
                 Login
