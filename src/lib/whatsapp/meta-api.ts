@@ -11,6 +11,7 @@
 
 import { isBusinessScopedUserId } from './wa-identity'
 import { getT } from '@/lib/i18n/translate'
+import type { MetaPricingDataPoint } from './meta-usage'
 
 const ti = getT('Validation.interactive')
 
@@ -1259,4 +1260,119 @@ export async function downloadMedia(
     response.headers.get('content-type') || 'application/octet-stream'
   const buffer = Buffer.from(await response.arrayBuffer())
   return { buffer, contentType }
+}
+
+
+// ============================================================
+// WABA Pricing & Volume Analytics
+// ============================================================
+
+export interface GetWabaPricingAnalyticsArgs {
+  wabaId: string
+  accessToken: string
+  startUnix: number
+  endUnix: number
+}
+
+export interface GetWabaPricingAnalyticsResult {
+  wabaId: string
+  wabaName: string | null
+  currency: string | null
+  costAvailable: boolean
+  dataPoints: MetaPricingDataPoint[]
+}
+
+interface RawPricingAnalyticsResponse {
+  id?: string
+  name?: string
+  currency?: string
+  pricing_analytics?: {
+    data?: Array<{
+      data_points?: Array<{
+        start?: number
+        end?: number
+        volume?: number
+        cost?: number
+        pricing_category?: string
+        pricing_type?: string
+      }>
+    }>
+  }
+}
+
+function parseRawPricingPoints(payload: RawPricingAnalyticsResponse): MetaPricingDataPoint[] {
+  const buckets = payload.pricing_analytics?.data ?? []
+  const points: MetaPricingDataPoint[] = []
+  for (const bucket of buckets) {
+    for (const dp of bucket.data_points ?? []) {
+      const start = Number(dp.start)
+      const end = Number(dp.end)
+      if (!Number.isFinite(start)) continue
+      points.push({
+        start,
+        end: Number.isFinite(end) ? end : start,
+        volume: Number(dp.volume) || 0,
+        cost: Number(dp.cost) || 0,
+        pricingCategory: String(dp.pricing_category ?? ''),
+        pricingType: String(dp.pricing_type ?? ''),
+      })
+    }
+  }
+  return points
+}
+
+async function fetchWabaPricingAttempt(params: {
+  wabaId: string
+  accessToken: string
+  startUnix: number
+  endUnix: number
+  includeCost: boolean
+}): Promise<GetWabaPricingAnalyticsResult> {
+  const start = Math.floor(params.startUnix)
+  const end = Math.max(start + 60, Math.floor(params.endUnix))
+  const metricTypes = params.includeCost ? '["VOLUME","COST"]' : '["VOLUME"]'
+  const dimensions = '["PRICING_CATEGORY","PRICING_TYPE"]'
+  const fields = `id,name,currency,pricing_analytics.start(${start}).end(${end}).granularity(DAILY).metric_types(${metricTypes}).dimensions(${dimensions})`
+
+  const response = await fetch(
+    `${META_API_BASE}/${encodeURIComponent(params.wabaId)}?fields=${encodeURIComponent(fields)}`,
+    {
+      headers: { Authorization: `Bearer ${params.accessToken}` },
+      cache: 'no-store',
+    },
+  )
+
+  if (!response.ok) {
+    await throwMetaError(response, `Meta pricing analytics failed: ${response.status}`)
+  }
+
+  const data = (await response.json()) as RawPricingAnalyticsResponse
+  return {
+    wabaId: data.id || params.wabaId,
+    wabaName: data.name ?? null,
+    currency: data.currency ?? null,
+    costAvailable: params.includeCost,
+    dataPoints: parseRawPricingPoints(data),
+  }
+}
+
+/**
+ * Fetch delivered message volume and approximate Meta spend from the
+ * WABA `pricing_analytics` Graph field. Falls back cleanly to VOLUME-only
+ * if COST is unavailable (e.g. BSP-billed accounts).
+ */
+export async function getWabaPricingAnalytics(
+  args: GetWabaPricingAnalyticsArgs,
+): Promise<GetWabaPricingAnalyticsResult> {
+  try {
+    return await fetchWabaPricingAttempt({ ...args, includeCost: true })
+  } catch (err) {
+    if (
+      err instanceof MetaApiError &&
+      (err.subcode === 2388184 || /cost/i.test(err.message))
+    ) {
+      return fetchWabaPricingAttempt({ ...args, includeCost: false })
+    }
+    throw err
+  }
 }
