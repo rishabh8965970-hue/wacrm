@@ -242,14 +242,18 @@ export default async function PricingPage() {
                 </div>
 
                 <Link
-                  href={isAuthenticated ? "/dashboard" : plan.ctaHref}
+                  href={isAuthenticated ? '/settings?tab=billing' : plan.ctaHref}
                   className={
                     plan.highlighted
-                      ? "mt-8 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 text-sm font-bold text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-500"
-                      : "mt-8 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-900 hover:bg-slate-50"
+                      ? 'mt-8 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 text-sm font-bold text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-500'
+                      : 'mt-8 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-900 hover:bg-slate-50'
                   }
                 >
-                  {isAuthenticated ? "Open Dashboard" : plan.ctaLabel}
+                  {isAuthenticated
+                    ? plan.price === '₹0'
+                      ? 'Open Billing & Plans'
+                      : 'Upgrade via Razorpay'
+                    : plan.ctaLabel}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
