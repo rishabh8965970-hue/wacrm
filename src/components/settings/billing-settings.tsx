@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { MetaUsageCard } from '@/components/dashboard/meta-usage-card';
 import { SettingsPanelHead } from './settings-panel-head';
 import {
   BILLING_PLANS,
@@ -419,6 +420,8 @@ export function BillingSettings() {
             </CardContent>
           </Card>
 
+          <MetaUsageCard range={30} />
+
           {/* Platform Super Admin Section */}
           {isSuperAdmin && (
             <Card className="border-amber-500/30 bg-card">
@@ -524,4 +527,4 @@ export function BillingSettings() {
       )}
     </div>
   );
-                }
+}
