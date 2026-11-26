@@ -193,6 +193,7 @@ export const RATE_LIMITS = {
   aiAutoReplyAccount: { limit: 30, windowMs: 60_000 },
   whatsappAdmin: { limit: 30, windowMs: 60_000 },
   whatsappHealth: { limit: 30, windowMs: 60_000 },
+  whatsappUsage: { limit: 60, windowMs: 60_000 },
   whatsappMedia: { limit: 240, windowMs: 60_000 },
   automationTrigger: { limit: 30, windowMs: 60_000 },
 } as const;
