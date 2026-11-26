@@ -25,6 +25,7 @@ import { AttentionRow } from '@/components/dashboard/attention-row'
 import { CampaignsCard } from '@/components/dashboard/campaigns-card'
 import { KpiRow } from '@/components/dashboard/kpi-row'
 import { MessageVolumeCard } from '@/components/dashboard/message-volume-card'
+import { MetaUsageCard } from '@/components/dashboard/meta-usage-card'
 import { OverviewHeader } from '@/components/dashboard/overview-header'
 import { PipelineCard } from '@/components/dashboard/pipeline-card'
 import { ReplyQueueCard } from '@/components/dashboard/reply-queue-card'
@@ -170,6 +171,8 @@ function DashboardPageInner() {
               <CampaignsCard data={data} />
             </div>
           </div>
+
+          <MetaUsageCard range={range} />
 
           <ActivityFeed items={activity} loading={activityLoading} />
         </>
