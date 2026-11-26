@@ -4,19 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { CheckCircle, ArrowLeft } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
-import { AuthShell } from "@/components/auth/auth-shell";
+import { ArrowLeft, CheckCircle, Mail } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const t = useTranslations("ForgotPasswordPage");
@@ -31,13 +20,9 @@ export default function ForgotPasswordPage() {
     setError(null);
     setLoading(true);
 
-    // The emailed link returns to /auth/callback, which exchanges it
-    // for a recovery session and forwards to /reset-password (issue
-    // #592). Supabase must allow this origin under Authentication →
-    // URL Configuration → Redirect URLs, or it silently falls back to
-    // its Site URL; see docs/auth-emails.md.
+    const redirectTo = `${window.location.origin}/auth/callback?next=/reset-password`;
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/reset-password")}`,
+      redirectTo,
     });
 
     if (error) {
@@ -50,92 +35,120 @@ export default function ForgotPasswordPage() {
     setLoading(false);
   };
 
-  if (success) {
-    return (
-      <AuthShell>
-        <Card className="w-full max-w-md border-border bg-card shadow-lg shadow-black/15">
-          <CardHeader className="items-center text-center">
-            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-              <CheckCircle className="h-6 w-6 text-primary" />
+  return (
+    <div className="flex min-h-screen flex-col justify-between bg-gradient-to-br from-emerald-50 via-white to-teal-50/70 px-4 py-6 text-slate-900">
+      <header className="mx-auto flex w-full max-w-md items-center justify-between text-xs font-medium text-slate-600">
+        <Link href="/" className="flex items-center gap-2 text-slate-900">
+          <BrandLogo className="h-7 w-7" />
+          <span className="font-bold">ChatStack WhatsApp CRM</span>
+        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/" className="hover:text-emerald-700">
+            Home
+          </Link>
+          <Link href="/pricing" className="hover:text-emerald-700">
+            Pricing
+          </Link>
+        </div>
+      </header>
+
+      <div className="mx-auto my-8 w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-emerald-950/5">
+        {success ? (
+          <div className="text-center">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+              <CheckCircle className="h-7 w-7" />
             </div>
-            <CardTitle className="text-xl text-foreground">
+            <h1 className="text-xl font-bold text-slate-900">
               {t("checkEmailTitle")}
-            </CardTitle>
-            <CardDescription className="text-muted-foreground">
+            </h1>
+            <p className="mt-2 text-sm text-slate-600">
               {t.rich("checkEmailDesc", {
                 email,
                 strong: (chunks) => (
-                  <span className="text-foreground">{chunks}</span>
+                  <span className="font-semibold text-slate-900">{chunks}</span>
                 ),
               })}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/login">
-              <Button
-                variant="outline"
-                className="w-full border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                {t("backToSignIn")}
-              </Button>
+            </p>
+            <Link
+              href="/login"
+              className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+            >
+              {t("backToSignIn")}
             </Link>
-          </CardContent>
-        </Card>
-      </AuthShell>
-    );
-  }
-
-  return (
-    <AuthShell>
-      <Card className="w-full max-w-md border-border bg-card shadow-lg shadow-black/15">
-        <CardHeader className="items-center text-center">
-          <BrandLogo className="mb-2 h-12 w-12" />
-          <CardTitle className="text-xl text-foreground">{t("title")}</CardTitle>
-          <CardDescription className="text-muted-foreground">
-            {t("desc")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleReset} className="flex flex-col gap-4">
-            {error && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-                {error}
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email" className="text-muted-foreground">
-                {t("emailLabel")}
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder={t("emailPlaceholder")}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-              />
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col items-center text-center">
+              <BrandLogo className="mb-3 h-12 w-12" />
+              <h1 className="text-xl font-bold text-slate-900">{t("title")}</h1>
+              <p className="mt-1 text-xs text-slate-500">{t("desc")}</p>
             </div>
 
-            <Button
-              type="submit"
-              disabled={loading}
-              className="mt-2 h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {loading ? t("sending") : t("sendLink")}
-            </Button>
-          </form>
+            <form onSubmit={handleReset} className="mt-6 flex flex-col gap-4">
+              {error && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">
+                  {error}
+                </div>
+              )}
 
-          <Link
-            href="/login"
-            className="mt-6 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {t("backToSignIn")}
-          </Link>
-        </CardContent>
-      </Card>
-    </AuthShell>
+              <div>
+                <label
+                  htmlFor="email"
+                  className="mb-1.5 block text-xs font-semibold text-slate-700"
+                >
+                  {t("emailLabel")}
+                </label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="email"
+                    type="email"
+                    placeholder={t("emailPlaceholder")}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-4 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#16a34a] to-[#0d9488] text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:opacity-95 disabled:opacity-60"
+              >
+                {loading ? t("sending") : t("sendLink")}
+              </button>
+            </form>
+
+            <Link
+              href="/login"
+              className="mt-6 flex items-center justify-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              {t("backToSignIn")}
+            </Link>
+          </>
+        )}
+      </div>
+
+      <footer className="mx-auto flex w-full max-w-md flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-slate-500">
+        <Link href="/" className="hover:text-slate-800">
+          Home
+        </Link>
+        <Link href="/pricing" className="hover:text-slate-800">
+          Pricing
+        </Link>
+        <Link href="/privacy" className="hover:text-slate-800">
+          Privacy Policy
+        </Link>
+        <Link href="/terms" className="hover:text-slate-800">
+          Terms
+        </Link>
+        <Link href="/contact" className="hover:text-slate-800">
+          Contact
+        </Link>
+      </footer>
+    </div>
   );
 }
