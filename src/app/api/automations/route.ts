@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
+import { checkAccountPlanFeature } from '@/lib/billing/server'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { getTemplate } from '@/lib/automations/templates'
 import { insertSteps, type BuilderStepInput } from '@/lib/automations/steps-tree'
@@ -56,6 +57,21 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: t('common.profileNotLinked') },
       { status: 403 },
+    )
+  }
+
+  const planCheck = await checkAccountPlanFeature(
+    accountId,
+    'automations',
+    user.email,
+  )
+  if (!planCheck.allowed) {
+    return NextResponse.json(
+      {
+        error:
+          'Upgrade to the Growth or Business plan in Settings → Billing to create automations.',
+      },
+      { status: 402 },
     )
   }
 
