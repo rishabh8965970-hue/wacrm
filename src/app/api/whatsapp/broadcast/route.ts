@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
+import { checkAccountPlanFeature } from '@/lib/billing/server'
 import { sendTemplateMessage } from '@/lib/whatsapp/meta-api'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import type { SendTimeParams } from '@/lib/whatsapp/template-send-builder'
@@ -76,6 +77,22 @@ export async function POST(request: Request) {
     // Nothing about that is recoverable after the fact, so the check has
     // to happen here.
     const { supabase, accountId, userId } = await requireRole('agent')
+
+    const { data: authData } = await supabase.auth.getUser()
+    const planCheck = await checkAccountPlanFeature(
+      accountId,
+      'broadcasts',
+      authData.user?.email,
+    )
+    if (!planCheck.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            'Upgrade to the Growth or Business plan in Settings → Billing to send bulk broadcasts.',
+        },
+        { status: 402 },
+      )
+    }
 
     // Per-user broadcast budget. Note: this limits how often a user
     // can *start* a campaign, not how many messages go out inside
