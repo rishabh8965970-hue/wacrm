@@ -1,26 +1,24 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { CheckCircle, UsersRound } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
-import { AuthShell } from "@/components/auth/auth-shell";
+import {
+  ArrowRight,
+  CheckCircle,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  User,
+  UserPlus,
+  UsersRound,
+} from "lucide-react";
 
-// `useSearchParams` opts the component out of static prerendering
-// unless wrapped in Suspense — same pattern as /login.
 export default function SignupPage() {
   return (
     <Suspense fallback={null}>
@@ -31,18 +29,15 @@ export default function SignupPage() {
 
 function SignupPageInner() {
   const searchParams = useSearchParams();
-  // When the user lands here from `/join/<token>` we carry the
-  // invite token in the query so it survives the signup → email
-  // verification → redirect round-trip. `emailRedirectTo` below
-  // sends the verified user to /join/<token> so they land on the
-  // redeem step instead of being dropped on /dashboard.
   const inviteToken = searchParams.get("invite");
   const t = useTranslations("SignupPage");
-
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -51,6 +46,11 @@ function SignupPageInner() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!acceptedTerms) {
+      setError("Please agree to the Terms & Conditions and Privacy Policy.");
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError(t("passwordsMismatch"));
@@ -64,16 +64,6 @@ function SignupPageInner() {
 
     setLoading(true);
 
-    // Always name our own origin as the place the confirmation link
-    // returns to. Previously this was left unset unless an invite was
-    // involved, so Supabase fell back to its Site URL — which on a
-    // freshly-created or self-hosted project is `http://localhost:3000`
-    // (issue #595) — and even when the Site URL was right the link
-    // landed on `/` with an unexchanged `?code=`, so the user had to
-    // sign in again after verifying. /auth/callback exchanges the link
-    // for a session and forwards to `next` (issue #592). Supabase still
-    // has to allow this origin under Authentication → URL Configuration
-    // → Redirect URLs; see docs/auth-emails.md.
     const next = inviteToken
       ? `/join/${encodeURIComponent(inviteToken)}`
       : "/dashboard";
@@ -102,155 +92,318 @@ function SignupPageInner() {
 
   if (success) {
     return (
-      <AuthShell>
-        <Card className="w-full max-w-md border-border bg-card shadow-lg shadow-black/15">
-          <CardHeader className="items-center text-center">
-            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-              <CheckCircle className="h-6 w-6 text-primary" />
-            </div>
-            <CardTitle className="text-xl text-foreground">
-              {t("checkEmailTitle")}
-            </CardTitle>
-            <CardDescription className="text-muted-foreground">
-              {t.rich("checkEmailDesc", {
-                email,
-                strong: (chunks) => (
-                  <span className="text-foreground">{chunks}</span>
-                ),
-              })}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link
-              href={
-                inviteToken
-                  ? `/login?invite=${encodeURIComponent(inviteToken)}`
-                  : "/login"
-              }
-            >
-              <Button
-                variant="outline"
-                className="w-full border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                {t("backToSignIn")}
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </AuthShell>
+      <div className="flex min-h-screen flex-col justify-between bg-gradient-to-br from-emerald-50 via-white to-teal-50 px-4 py-8 text-slate-900">
+        <div className="mx-auto flex w-full max-w-md items-center justify-between text-xs text-slate-600">
+          <Link href="/" className="flex items-center gap-2 font-bold text-slate-900">
+            <BrandLogo className="h-7 w-7" />
+            <span>ChatStack WhatsApp CRM</span>
+          </Link>
+          <Link href="/login" className="font-semibold text-emerald-700">
+            Login
+          </Link>
+        </div>
+
+        <div className="mx-auto my-8 w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xl">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+            <CheckCircle className="h-7 w-7" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">
+            {t("checkEmailTitle")}
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            {t.rich("checkEmailDesc", {
+              email,
+              strong: (chunks) => (
+                <span className="font-semibold text-slate-900">{chunks}</span>
+              ),
+            })}
+          </p>
+          <Link
+            href={
+              inviteToken
+                ? `/login?invite=${encodeURIComponent(inviteToken)}`
+                : "/login"
+            }
+            className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+          >
+            {t("backToSignIn")}
+          </Link>
+        </div>
+
+        <div className="text-center text-xs text-slate-500">
+          <Link href="/privacy" className="hover:underline">
+            Privacy Policy
+          </Link>{" "}
+          ·{" "}
+          <Link href="/terms" className="hover:underline">
+            Terms
+          </Link>{" "}
+          ·{" "}
+          <Link href="/contact" className="hover:underline">
+            Contact
+          </Link>
+        </div>
+      </div>
     );
   }
 
   return (
-    <AuthShell>
-      <Card className="w-full max-w-md border-border bg-card shadow-lg shadow-black/15">
-        <CardHeader className="items-center text-center">
-          {inviteToken ? (
-            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-              <UsersRound className="h-6 w-6 text-primary" />
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-teal-50/70 text-slate-900">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-32 -left-24 h-96 w-[38rem] rounded-full bg-emerald-300/20 blur-3xl"
+      />
+
+      {/* Light Top Navbar matching Reference 2 */}
+      <header className="relative z-10 border-b border-emerald-100 bg-white/80 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+          <Link href="/" className="flex items-center gap-2.5">
+            <BrandLogo className="h-8 w-8" />
+            <div className="flex flex-col leading-none">
+              <span className="text-base font-extrabold tracking-wide text-slate-900">
+                CHATSTACK
+              </span>
+              <span className="text-[10px] font-medium text-emerald-600">
+                Automate • Engage • Grow
+              </span>
             </div>
-          ) : (
-            <BrandLogo className="mb-2 h-12 w-12" />
-          )}
-          <CardTitle className="text-xl text-foreground">
-            {inviteToken ? t("titleJoin") : t("title")}
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            {inviteToken ? t("descJoin") : t("desc")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSignup} className="flex flex-col gap-4">
-            {error && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-                {error}
-              </div>
-            )}
+          </Link>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="fullName" className="text-muted-foreground">
-                {t("fullNameLabel")}
-              </Label>
-              <Input
-                id="fullName"
-                type="text"
-                placeholder={t("fullNamePlaceholder")}
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email" className="text-muted-foreground">
-                {t("emailLabel")}
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder={t("emailPlaceholder")}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="password" className="text-muted-foreground">
-                {t("passwordLabel")}
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder={t("passwordPlaceholder")}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="confirmPassword" className="text-muted-foreground">
-                {t("confirmPasswordLabel")}
-              </Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder={t("confirmPasswordPlaceholder")}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              disabled={loading}
-              className="mt-2 h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {loading ? t("creating") : t("submit")}
-            </Button>
-          </form>
-
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            {t("haveAccount")}{" "}
-            <Link
-              href={
-                inviteToken
-                  ? `/login?invite=${encodeURIComponent(inviteToken)}`
-                  : "/login"
-              }
-              className="text-primary hover:text-primary/80"
-            >
-              {t("signIn")}
+          <nav className="hidden items-center gap-6 text-sm font-medium text-slate-600 md:flex">
+            <Link href="/" className="hover:text-emerald-700">
+              Home
             </Link>
+            <Link href="/#features" className="hover:text-emerald-700">
+              Services
+            </Link>
+            <Link href="/pricing" className="hover:text-emerald-700">
+              Pricing
+            </Link>
+            <Link href="/privacy" className="hover:text-emerald-700">
+              Privacy
+            </Link>
+            <Link href="/contact" className="hover:text-emerald-700">
+              Support
+            </Link>
+          </nav>
+
+          <div className="flex items-center gap-2.5">
+            <Link
+              href="/login"
+              className="inline-flex h-9 items-center rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Login
+            </Link>
+            <Link
+              href="/signup"
+              className="hidden h-9 items-center gap-1 rounded-full bg-[#16a34a] px-4 text-sm font-semibold text-white sm:inline-flex"
+            >
+              Get Started Free
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Split Content */}
+      <main className="relative z-10 mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-4 py-10 sm:px-6 lg:grid-cols-12">
+        {/* Left Value Prop + 3D Bot Mascot */}
+        <div className="hidden lg:col-span-6 lg:block">
+          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 xl:text-5xl">
+            Create Your <span className="text-[#16a34a]">Account</span>
+          </h1>
+          <p className="mt-3 max-w-md text-base leading-relaxed text-slate-600">
+            Join ChatStack WhatsApp CRM and start growing your business with
+            WhatsApp.
           </p>
-        </CardContent>
-      </Card>
-    </AuthShell>
+
+          <ul className="mt-6 space-y-3 text-sm font-medium text-slate-700">
+            {[
+              "Automate Messages & Save Time",
+              "Use AI Chatbot & Auto Reply",
+              "Manage Multiple Agents",
+              "Get Better Customer Engagement",
+            ].map((item) => (
+              <li key={item} className="flex items-center gap-2.5">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-[#16a34a]" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-8 flex items-end gap-4">
+            <img
+              src="/images/bot-mascot.png"
+              alt="ChatStack WhatsApp CRM robot mascot"
+              className="h-60 w-auto drop-shadow-[0_18px_30px_rgba(16,185,129,0.22)]"
+            />
+            <div className="mb-16 rounded-2xl border border-emerald-200 bg-white/90 px-4 py-2 text-sm font-bold text-emerald-700 shadow-md">
+              Let&apos;s Grow Together!
+            </div>
+          </div>
+        </div>
+
+        {/* Right Form Card */}
+        <div className="mx-auto w-full max-w-md lg:col-span-6">
+          <div className="rounded-3xl border border-slate-200/90 bg-white p-7 shadow-2xl shadow-emerald-950/10 sm:p-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                {inviteToken ? (
+                  <UsersRound className="h-6 w-6" />
+                ) : (
+                  <UserPlus className="h-6 w-6" />
+                )}
+              </div>
+              <h2 className="text-2xl font-extrabold text-slate-900">
+                {inviteToken ? t("titleJoin") : t("title")}
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                {inviteToken
+                  ? t("descJoin")
+                  : "Fill in the details below to get started"}
+              </p>
+            </div>
+
+            <form onSubmit={handleSignup} className="mt-6 flex flex-col gap-3.5">
+              {error && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">
+                  {error}
+                </div>
+              )}
+
+              <div className="relative">
+                <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="fullName"
+                  type="text"
+                  aria-label={t("fullNameLabel")}
+                  placeholder={t("fullNamePlaceholder")}
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-4 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="email"
+                  type="email"
+                  aria-label={t("emailLabel")}
+                  placeholder={t("emailPlaceholder")}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-4 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  aria-label={t("passwordLabel")}
+                  placeholder={t("passwordPlaceholder")}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-10 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  aria-label={t("confirmPasswordLabel")}
+                  placeholder={t("confirmPasswordPlaceholder")}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-10 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  aria-label={
+                    showConfirmPassword ? "Hide password" : "Show password"
+                  }
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+
+              <label className="mt-1 flex items-center gap-2 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 accent-emerald-600"
+                />
+                <span>
+                  I agree to the{" "}
+                  <Link
+                    href="/terms"
+                    className="font-semibold text-emerald-600 hover:underline"
+                  >
+                    Terms &amp; Conditions
+                  </Link>{" "}
+                  and{" "}
+                  <Link
+                    href="/privacy"
+                    className="font-semibold text-emerald-600 hover:underline"
+                  >
+                    Privacy Policy
+                  </Link>
+                </span>
+              </label>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-2 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#16a34a] to-[#0d9488] text-sm font-bold text-white shadow-lg shadow-emerald-500/25 transition-opacity hover:opacity-95 disabled:opacity-60"
+              >
+                <UserPlus className="h-4 w-4" />
+                {loading ? t("creating") : t("submit")}
+              </button>
+            </form>
+
+            <p className="mt-5 text-center text-sm text-slate-600">
+              {t("haveAccount")}{" "}
+              <Link
+                href={
+                  inviteToken
+                    ? `/login?invite=${encodeURIComponent(inviteToken)}`
+                    : "/login"
+                }
+                className="font-bold text-emerald-600 hover:text-emerald-700"
+              >
+                {t("signIn")}
+              </Link>
+            </p>
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }
