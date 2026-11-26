@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Broadcast } from '@/types';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -181,22 +182,30 @@ export default function BroadcastsPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t('title')}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {t('subtitle')}
           </p>
         </div>
-        <GatedButton
-          canAct={canCreate}
-          gateReason={tGate('reasons.createBroadcasts')}
-          onClick={() => router.push('/broadcasts/new')}
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          {t('newBroadcast')}
-        </GatedButton>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard#meta-spend"
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            Meta Spend &amp; Wallet
+          </Link>
+          <GatedButton
+            canAct={canCreate}
+            gateReason={tGate('reasons.createBroadcasts')}
+            onClick={() => router.push('/broadcasts/new')}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            {t('newBroadcast')}
+          </GatedButton>
+        </div>
       </div>
 
       {broadcasts.length === 0 ? (
