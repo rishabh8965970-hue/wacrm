@@ -1964,7 +1964,8 @@
       "deals": "Deals & currency",
       "inbox": "Inbox",
       "members": "Team members",
-      "api": "API keys"
+      "api": "API keys",
+      "billing": "Billing & plans"
     },
     "groups": {
       "account": "Account",
