@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
+import { checkAccountPlanFeature } from '@/lib/billing/server'
 import { supabaseAdmin } from '@/lib/flows/admin-client'
 import { getFlowTemplate } from '@/lib/flows/templates'
 import { getT } from '@/lib/i18n/translate'
@@ -53,7 +54,22 @@ export async function POST(request: Request) {
   // `agent`, but this route inserts via the service-role client which
   // bypasses RLS, so the role must be enforced here.
   try {
-    await requireRole('agent')
+    const ctx = await requireRole('agent')
+    const { data: authData } = await ctx.supabase.auth.getUser()
+    const planCheck = await checkAccountPlanFeature(
+      ctx.accountId,
+      'automations',
+      authData.user?.email,
+    )
+    if (!planCheck.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            'Upgrade to the Growth or Business plan in Settings → Billing to create visual flows.',
+        },
+        { status: 402 },
+      )
+    }
   } catch (err) {
     return toErrorResponse(err)
   }
