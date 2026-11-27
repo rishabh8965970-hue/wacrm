@@ -8,10 +8,20 @@ import {
   Copy,
   Loader2,
   RefreshCw,
+  Send,
   ShieldCheck,
   AlertTriangle,
 } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Card,
   CardContent,
@@ -45,6 +55,15 @@ export function OtpApiPanel() {
   const [logs, setLogs] = useState<OtpLogItem[]>([]);
   const [templates, setTemplates] = useState<ApprovedTemplateItem[]>([]);
   const [hasAuthTemplate, setHasAuthTemplate] = useState(false);
+
+  // Interactive test console state
+  const [testPhone, setTestPhone] = useState('+91');
+  const [testMode, setTestMode] = useState<'auto' | 'session_text' | 'template'>('auto');
+  const [sendingTest, setSendingTest] = useState(false);
+  const [lastOtpId, setLastOtpId] = useState<string | null>(null);
+  const [testCode, setTestCode] = useState('');
+  const [verifyingTest, setVerifyingTest] = useState(false);
+  const [verifyBanner, setVerifyBanner] = useState<string | null>(null);
 
   const origin =
     typeof window !== 'undefined' ? window.location.origin : 'https://chatstack.cloud';
@@ -84,7 +103,9 @@ export function OtpApiPanel() {
       };
       setLogs(data.logs ?? []);
       setTemplates(data.approvedTemplates ?? []);
-      setHasAuthTemplate(Boolean(data.hasAuthTemplate));
+      const hasAuth = Boolean(data.hasAuthTemplate);
+      setHasAuthTemplate(hasAuth);
+      setTestMode((prev) => (prev === 'auto' ? (hasAuth ? 'template' : 'session_text') : prev));
     } finally {
       setLoading(false);
     }
@@ -97,6 +118,83 @@ export function OtpApiPanel() {
   function copySnippet(text: string, label: string) {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied`);
+  }
+
+  async function handleSendTestOtp() {
+    if (!testPhone.trim() || testPhone.trim() === '+91') {
+      toast.error('Enter full phone with country code, e.g. +916262454467');
+      return;
+    }
+    setSendingTest(true);
+    setVerifyBanner(null);
+    try {
+      const res = await fetch('/api/account/otp-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send',
+          phone: testPhone.trim(),
+          purpose: 'test',
+          length: 6,
+          expiry_minutes: 5,
+          delivery_mode: testMode,
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        otp_id?: string;
+        to?: string;
+        delivery_mode?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        toast.error(json.error ?? 'Failed to send test OTP');
+        return;
+      }
+      setLastOtpId(json.otp_id ?? null);
+      toast.success(
+        `OTP sent to ${json.to ?? testPhone} (${json.delivery_mode === 'session_text' ? '24h Session Text' : 'Template'})`,
+      );
+      void load();
+    } finally {
+      setSendingTest(false);
+    }
+  }
+
+  async function handleVerifyTestOtp() {
+    if (!testCode.trim()) {
+      toast.error('Enter the OTP received on WhatsApp');
+      return;
+    }
+    setVerifyingTest(true);
+    try {
+      const res = await fetch('/api/account/otp-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'verify',
+          phone: testPhone.trim(),
+          otp_id: lastOtpId ?? undefined,
+          purpose: 'test',
+          otp: testCode.trim(),
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        verified?: boolean;
+        verified_at?: string;
+        error?: string;
+      };
+      if (!res.ok || !json.verified) {
+        toast.error(json.error ?? 'OTP verification failed');
+        void load();
+        return;
+      }
+      setVerifyBanner(`Verified at ${new Date(json.verified_at ?? Date.now()).toLocaleTimeString()}`);
+      setTestCode('');
+      toast.success('OTP verified successfully!');
+      void load();
+    } finally {
+      setVerifyingTest(false);
+    }
   }
 
   return (
@@ -140,9 +238,10 @@ export function OtpApiPanel() {
               <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
               <span>
                 No <strong>APPROVED</strong> Meta <code>AUTHENTICATION</code> template synced yet.
-                Create an Authentication OTP template in Meta Business &amp; click{' '}
-                <strong>Sync from Meta</strong> in Templates (or pass an approved{' '}
-                <code>template_name</code>).
+                Create one in Meta Business &amp; click <strong>Sync from Meta</strong> in Templates
+                for cold OTPs — or test instantly below via{' '}
+                <strong>24h Session Text</strong> (send <code>&quot;Hi&quot;</code> to your WABA
+                number first).
               </span>
             </span>
             <Link
@@ -153,6 +252,98 @@ export function OtpApiPanel() {
             </Link>
           </div>
         )}
+
+        {/* Interactive Dashboard Test Console */}
+        <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold text-foreground">
+                Quick Test OTP (No code needed)
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                For <strong>24h Session Text</strong>, send any WhatsApp message (like{' '}
+                <code>Hi</code>) from your test number to your business number once, then click Send
+                Test OTP.
+              </p>
+            </div>
+            {verifyBanner && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] text-emerald-300">
+                <CheckCircle2 className="size-3" />
+                {verifyBanner}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+            <div className="space-y-1 md:col-span-4">
+              <Label className="text-[11px] text-muted-foreground">Test WhatsApp Number</Label>
+              <Input
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+                placeholder="+916262454467"
+                className="h-8 text-xs font-mono"
+              />
+            </div>
+
+            <div className="space-y-1 md:col-span-3">
+              <Label className="text-[11px] text-muted-foreground">Delivery Mode</Label>
+              <Select
+                value={testMode}
+                onValueChange={(v) => setTestMode(v as 'auto' | 'session_text' | 'template')}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="session_text">24h Session Text (Instant Test)</SelectItem>
+                  <SelectItem value="template">Meta Auth Template</SelectItem>
+                  <SelectItem value="auto">Auto (Template else Text)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-end md:col-span-2">
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 w-full text-xs"
+                onClick={handleSendTestOtp}
+                disabled={sendingTest}
+              >
+                {sendingTest ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Send className="size-3.5" />
+                )}
+                Send OTP
+              </Button>
+            </div>
+
+            <div className="space-y-1 md:col-span-2">
+              <Label className="text-[11px] text-muted-foreground">Enter Received OTP</Label>
+              <Input
+                value={testCode}
+                onChange={(e) => setTestCode(e.target.value)}
+                placeholder="123456"
+                maxLength={8}
+                className="h-8 text-xs font-mono"
+              />
+            </div>
+
+            <div className="flex items-end md:col-span-1">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 w-full text-xs"
+                onClick={handleVerifyTestOtp}
+                disabled={verifyingTest}
+              >
+                {verifyingTest ? <Loader2 className="size-3.5 animate-spin" /> : 'Verify'}
+              </Button>
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
@@ -202,8 +393,8 @@ export function OtpApiPanel() {
           <p className="text-xs font-medium text-foreground">Recent OTP Verifications</p>
           {logs.length === 0 ? (
             <p className="rounded-lg border border-dashed border-border py-5 text-center text-xs text-muted-foreground">
-              No OTPs issued yet. Call <code>POST /api/v1/otp/send</code> with your API key to
-              start tracking verifications.
+              No OTPs issued yet. Use <strong>Quick Test OTP</strong> above or call{' '}
+              <code>POST /api/v1/otp/send</code> to start tracking verifications.
             </p>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border">
@@ -241,4 +432,4 @@ export function OtpApiPanel() {
       </CardContent>
     </Card>
   );
-}
+                }
