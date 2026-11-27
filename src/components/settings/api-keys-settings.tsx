@@ -42,6 +42,7 @@ import {
 } from '@/lib/api-keys/scopes';
 import { useTranslations } from 'next-intl';
 import { SettingsPanelHead } from './settings-panel-head';
+import { OtpApiPanel } from './otp-api-panel';
 
 interface ApiKey {
   id: string;
@@ -272,6 +273,8 @@ export function ApiKeysSettings() {
         onOpenChange={setCreateOpen}
         onCreated={load}
       />
+
+      <OtpApiPanel />
     </section>
   );
 }
