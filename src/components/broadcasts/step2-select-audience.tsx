@@ -2,8 +2,19 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { countAudience } from '@/lib/broadcast-audience';
+import {
+  countAudience,
+  type AudienceConfig,
+  type AudienceType,
+  type CustomFieldFilter,
+  type CustomFieldOperator,
+} from '@/lib/broadcast-audience';
 import { parseBroadcastCsv } from '@/lib/broadcast-csv';
+import {
+  buildPresetDateRange,
+  localDateBoundsToIso,
+  type ContactDateRangeFilter,
+} from '@/lib/contacts/date-range';
 import { CustomField, Tag } from '@/types';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -16,26 +27,10 @@ import {
   Loader2,
   ArrowRight,
   ArrowLeft,
+  Calendar,
   X,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-
-type AudienceType = 'all' | 'tags' | 'custom_field' | 'csv';
-type CustomFieldOperator = 'is' | 'is_not' | 'contains';
-
-interface CustomFieldFilter {
-  fieldId: string;
-  operator: CustomFieldOperator;
-  value: string;
-}
-
-interface AudienceConfig {
-  type: AudienceType;
-  tagIds?: string[];
-  customField?: CustomFieldFilter;
-  csvContacts?: { phone: string; name?: string }[];
-  excludeTagIds?: string[];
-}
 
 interface Step2Props {
   audience: AudienceConfig;
@@ -77,6 +72,12 @@ export function Step2SelectAudience({
       icon: Tags,
     },
     {
+      type: 'date_range',
+      label: 'By Date / Meta Ads',
+      description: 'Target contacts who arrived today, yesterday, or in a custom date range.',
+      icon: Calendar,
+    },
+    {
       type: 'custom_field',
       label: t('selectAudience.method.customField'),
       description: t('selectAudience.customFieldDesc'),
@@ -88,7 +89,17 @@ export function Step2SelectAudience({
       description: t('selectAudience.csvDesc'),
       icon: Upload,
     },
-  ], [t]);
+    ...(audience.type === 'selected'
+      ? [
+          {
+            type: 'selected' as const,
+            label: 'Selected Contacts',
+            description: `${audience.contactIds?.length ?? 0} contact(s) picked from Contacts.`,
+            icon: Users,
+          },
+        ]
+      : []),
+  ], [t, audience.type, audience.contactIds?.length]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [loadingTags, setLoadingTags] = useState(false);
@@ -150,6 +161,8 @@ export function Step2SelectAudience({
           tagIds: audience.tagIds,
           customField: audience.customField,
           csvContacts: audience.csvContacts,
+          dateRange: audience.dateRange,
+          contactIds: audience.contactIds,
           excludeTagIds: audience.excludeTagIds,
         }),
       );
@@ -163,6 +176,8 @@ export function Step2SelectAudience({
     audience.tagIds,
     audience.customField,
     audience.csvContacts,
+    audience.dateRange,
+    audience.contactIds,
     audience.excludeTagIds,
   ]);
 
@@ -228,9 +243,53 @@ export function Step2SelectAudience({
     onUpdate({ ...audience, customField: { ...prev, ...patch } });
   }
 
+  function selectDatePreset(preset: ContactDateRangeFilter['preset']) {
+    if (preset === 'custom') {
+      const base =
+        audience.dateRange ?? {
+          preset: 'today' as const,
+          ...buildPresetDateRange('today'),
+          onlyMetaAds: false,
+        };
+      onUpdate({
+        ...audience,
+        dateRange: { ...base, preset: 'custom' },
+      });
+      return;
+    }
+    const built = buildPresetDateRange(preset);
+    onUpdate({
+      ...audience,
+      dateRange: {
+        preset,
+        ...built,
+        onlyMetaAds: audience.dateRange?.onlyMetaAds ?? false,
+      },
+    });
+  }
+
+  function updateCustomDateBounds(fromDate: string, toDate: string) {
+    const bounds = localDateBoundsToIso(fromDate, toDate);
+    onUpdate({
+      ...audience,
+      dateRange: {
+        preset: 'custom',
+        fromDate,
+        toDate,
+        fromIso: bounds?.fromIso ?? '',
+        toIso: bounds?.toIso ?? '',
+        onlyMetaAds: audience.dateRange?.onlyMetaAds ?? false,
+      },
+    });
+  }
+
   const isValid =
     audience.type === 'all' ||
     (audience.type === 'tags' && audience.tagIds && audience.tagIds.length > 0) ||
+    (audience.type === 'date_range' &&
+      Boolean(audience.dateRange?.fromIso && audience.dateRange?.toIso)) ||
+    (audience.type === 'selected' &&
+      Boolean(audience.contactIds && audience.contactIds.length > 0)) ||
     (audience.type === 'custom_field' &&
       !!audience.customField?.fieldId &&
       audience.customField.value.length > 0) ||
@@ -267,6 +326,16 @@ export function Step2SelectAudience({
                       : undefined,
                   csvContacts:
                     option.type === 'csv' ? audience.csvContacts : undefined,
+                  dateRange:
+                    option.type === 'date_range'
+                      ? (audience.dateRange ?? {
+                          preset: 'today',
+                          ...buildPresetDateRange('today'),
+                          onlyMetaAds: false,
+                        })
+                      : undefined,
+                  contactIds:
+                    option.type === 'selected' ? audience.contactIds : undefined,
                 })
               }
               className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-all ${
@@ -328,6 +397,105 @@ export function Step2SelectAudience({
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {audience.type === 'date_range' && (
+        <div className="space-y-4 rounded-xl border border-border bg-card/50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-medium text-foreground">
+              Select Lead Date Range
+            </p>
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-foreground">
+              <input
+                type="checkbox"
+                checked={Boolean(audience.dateRange?.onlyMetaAds)}
+                onChange={(e) =>
+                  onUpdate({
+                    ...audience,
+                    dateRange: {
+                      ...(audience.dateRange ?? {
+                        preset: 'today',
+                        ...buildPresetDateRange('today'),
+                      }),
+                      onlyMetaAds: e.target.checked,
+                    },
+                  })
+                }
+                className="h-4 w-4 rounded border-border accent-primary"
+              />
+              Only Meta Ad Leads (Click-to-WhatsApp)
+            </label>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                { id: 'today', label: 'Today' },
+                { id: 'yesterday', label: 'Yesterday' },
+                { id: '7d', label: 'Last 7 days' },
+                { id: 'custom', label: 'Custom Date' },
+              ] as const
+            ).map((preset) => {
+              const active = (audience.dateRange?.preset ?? 'today') === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => selectDatePreset(preset.id)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+                    active
+                      ? 'border-primary/40 bg-primary/10 text-primary'
+                      : 'border-border bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">
+                From Date
+              </label>
+              <input
+                type="date"
+                value={audience.dateRange?.fromDate ?? ''}
+                onChange={(e) =>
+                  updateCustomDateBounds(
+                    e.target.value,
+                    audience.dateRange?.toDate ?? e.target.value,
+                  )
+                }
+                className="h-9 w-full rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">
+                To Date
+              </label>
+              <input
+                type="date"
+                value={audience.dateRange?.toDate ?? ''}
+                onChange={(e) =>
+                  updateCustomDateBounds(
+                    audience.dateRange?.fromDate ?? e.target.value,
+                    e.target.value,
+                  )
+                }
+                className="h-9 w-full rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </div>
+          {audience.dateRange?.fromDate &&
+            audience.dateRange?.toDate &&
+            !audience.dateRange?.fromIso && (
+              <p className="text-xs text-red-400">
+                To Date must be on or after From Date.
+              </p>
+            )}
         </div>
       )}
 
