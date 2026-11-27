@@ -16,6 +16,7 @@
 export const API_SCOPES = [
   'messages:send',
   'messages:read',
+  'otp:send',
   'contacts:read',
   'contacts:write',
   'conversations:read',
@@ -29,6 +30,7 @@ export type ApiScope = (typeof API_SCOPES)[number];
 export const SCOPE_DESCRIPTIONS: Record<ApiScope, string> = {
   'messages:send': 'Send WhatsApp messages',
   'messages:read': 'Read messages and their delivery status',
+  'otp:send': 'Send and verify WhatsApp OTP passcodes',
   'contacts:read': 'List and read contacts',
   'contacts:write': 'Create and update contacts',
   'conversations:read': 'List and read conversations',
