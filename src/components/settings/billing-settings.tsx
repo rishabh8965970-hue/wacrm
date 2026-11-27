@@ -8,11 +8,14 @@ import {
   Crown,
   Loader2,
   RefreshCw,
+  Search,
   ShieldCheck,
   Sparkles,
+  Users,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { MetaUsageCard } from '@/components/dashboard/meta-usage-card';
 import { SettingsPanelHead } from './settings-panel-head';
 import {
@@ -37,8 +40,25 @@ interface AdminWorkspaceRow {
   accountName: string;
   ownerEmail: string;
   ownerName: string;
+  memberCount?: number;
+  whatsappStatus?: string;
+  whatsappConnected?: boolean;
   createdAt: string;
   effective: EffectiveSubscription;
+}
+
+interface AdminUserRow {
+  userId: string;
+  fullName: string;
+  email: string;
+  role: string;
+  accountId: string | null;
+  workspaceName: string;
+  planId: string;
+  subscriptionStatus: string;
+  whatsappConnected: boolean;
+  isSuperAdmin: boolean;
+  createdAt: string;
 }
 
 interface RazorpaySuccessResponse {
@@ -77,6 +97,10 @@ export function BillingSettings() {
 
   const [adminLoading, setAdminLoading] = useState(false);
   const [workspaces, setWorkspaces] = useState<AdminWorkspaceRow[]>([]);
+  const [adminUsers, setAdminUsers] = useState<AdminUserRow[]>([]);
+  const [connectedWorkspaces, setConnectedWorkspaces] = useState(0);
+  const [adminTab, setAdminTab] = useState<'workspaces' | 'users'>('workspaces');
+  const [adminQuery, setAdminQuery] = useState('');
   const [revenueInr, setRevenueInr] = useState(0);
   const [updatingAccountId, setUpdatingAccountId] = useState<string | null>(null);
 
@@ -104,6 +128,8 @@ export function BillingSettings() {
       if (!res.ok) return;
       const data = await res.json();
       setWorkspaces(data.workspaces ?? []);
+      setAdminUsers(data.users ?? []);
+      setConnectedWorkspaces(data.connectedWorkspaces ?? 0);
       setRevenueInr(data.totalRevenueInr ?? 0);
     } finally {
       setAdminLoading(false);
@@ -423,106 +449,281 @@ export function BillingSettings() {
           <MetaUsageCard range={30} />
 
           {/* Platform Super Admin Section */}
-          {isSuperAdmin && (
-            <Card className="border-amber-500/30 bg-card">
-              <CardHeader className="flex flex-row items-center justify-between gap-4">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Crown className="h-4 w-4 text-amber-400" />
-                    Platform Admin — Customer Subscriptions
-                  </CardTitle>
-                  <CardDescription>
-                    Total workspaces: {workspaces.length} · Verified Razorpay
-                    revenue: ₹{revenueInr.toLocaleString('en-IN')}
-                  </CardDescription>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={fetchAdminWorkspaces}
-                  disabled={adminLoading}
-                >
-                  {adminLoading ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          {isSuperAdmin && (() => {
+            const q = adminQuery.trim().toLowerCase();
+            const filteredWorkspaces = q
+              ? workspaces.filter(
+                  (ws) =>
+                    ws.accountName.toLowerCase().includes(q) ||
+                    ws.ownerEmail.toLowerCase().includes(q) ||
+                    ws.ownerName.toLowerCase().includes(q),
+                )
+              : workspaces;
+            const filteredUsers = q
+              ? adminUsers.filter(
+                  (u) =>
+                    u.fullName.toLowerCase().includes(q) ||
+                    u.email.toLowerCase().includes(q) ||
+                    u.workspaceName.toLowerCase().includes(q),
+                )
+              : adminUsers;
+
+            return (
+              <Card className="border-amber-500/30 bg-card">
+                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Crown className="h-4 w-4 text-amber-400" />
+                      Platform Admin — Users &amp; Customer Subscriptions
+                    </CardTitle>
+                    <CardDescription>
+                      Total users: {adminUsers.length} · Workspaces: {workspaces.length} ·
+                      WhatsApp connected: {connectedWorkspaces} · Verified Razorpay revenue: ₹
+                      {revenueInr.toLocaleString('en-IN')}
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchAdminWorkspaces}
+                    disabled={adminLoading}
+                  >
+                    {adminLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      'Reload'
+                    )}
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="rounded-lg border border-border bg-muted/30 p-2.5">
+                      <div className="text-[11px] text-muted-foreground">Total Users</div>
+                      <div className="mt-0.5 text-lg font-semibold tabular-nums">
+                        {adminUsers.length}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-border bg-muted/30 p-2.5">
+                      <div className="text-[11px] text-muted-foreground">Workspaces</div>
+                      <div className="mt-0.5 text-lg font-semibold tabular-nums">
+                        {workspaces.length}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-border bg-muted/30 p-2.5">
+                      <div className="text-[11px] text-muted-foreground">WhatsApp Connected</div>
+                      <div className="mt-0.5 text-lg font-semibold tabular-nums">
+                        {connectedWorkspaces}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-border bg-muted/30 p-2.5">
+                      <div className="text-[11px] text-muted-foreground">Razorpay Revenue</div>
+                      <div className="mt-0.5 text-lg font-semibold tabular-nums">
+                        ₹{revenueInr.toLocaleString('en-IN')}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={adminTab === 'workspaces' ? 'default' : 'outline'}
+                        className="h-8 text-xs"
+                        onClick={() => setAdminTab('workspaces')}
+                      >
+                        Workspaces ({workspaces.length})
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={adminTab === 'users' ? 'default' : 'outline'}
+                        className="h-8 text-xs"
+                        onClick={() => setAdminTab('users')}
+                      >
+                        <Users className="mr-1 h-3.5 w-3.5" />
+                        All Users ({adminUsers.length})
+                      </Button>
+                    </div>
+                    <div className="relative w-full sm:w-64">
+                      <Search className="pointer-events-none absolute top-2 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input
+                        type="search"
+                        placeholder="Search name, email, workspace..."
+                        value={adminQuery}
+                        onChange={(e) => setAdminQuery(e.target.value)}
+                        className="h-8 pl-8 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {adminTab === 'workspaces' ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="border-b border-border text-muted-foreground">
+                          <tr>
+                            <th className="py-2 pr-3">Workspace</th>
+                            <th className="py-2 pr-3">Owner</th>
+                            <th className="py-2 pr-3">WhatsApp</th>
+                            <th className="py-2 pr-3">Plan / Status</th>
+                            <th className="py-2 pr-3">Days Left</th>
+                            <th className="py-2 pr-3">Joined</th>
+                            <th className="py-2">Quick Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/60">
+                          {filteredWorkspaces.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="py-4 text-center text-muted-foreground">
+                                No matching workspaces found.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredWorkspaces.map((ws) => (
+                              <tr key={ws.accountId}>
+                                <td className="py-2.5 pr-3">
+                                  <div className="font-medium">{ws.accountName}</div>
+                                  <div className="text-[11px] text-muted-foreground">
+                                    {ws.memberCount ?? 1} member(s)
+                                  </div>
+                                </td>
+                                <td className="py-2.5 pr-3">
+                                  <div className="font-medium">{ws.ownerName || '—'}</div>
+                                  <div className="text-[11px] text-muted-foreground">
+                                    {ws.ownerEmail}
+                                  </div>
+                                </td>
+                                <td className="py-2.5 pr-3">
+                                  <span
+                                    className={
+                                      ws.whatsappConnected
+                                        ? 'rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-400'
+                                        : 'rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground'
+                                    }
+                                  >
+                                    {ws.whatsappConnected ? 'Connected' : 'Not connected'}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 pr-3 capitalize">
+                                  {ws.effective.planId} ({ws.effective.status})
+                                </td>
+                                <td className="py-2.5 pr-3">
+                                  {ws.effective.isSuperAdmin
+                                    ? 'Unlimited'
+                                    : ws.effective.daysRemaining}
+                                </td>
+                                <td className="py-2.5 pr-3 text-muted-foreground">
+                                  {new Date(ws.createdAt).toLocaleDateString()}
+                                </td>
+                                <td className="py-2.5">
+                                  <div className="flex flex-wrap gap-1.5">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 text-[11px]"
+                                      disabled={updatingAccountId === ws.accountId}
+                                      onClick={() =>
+                                        handleAdminPlanChange(ws.accountId, 'growth', 30)
+                                      }
+                                    >
+                                      Growth 30d
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 text-[11px]"
+                                      disabled={updatingAccountId === ws.accountId}
+                                      onClick={() =>
+                                        handleAdminPlanChange(ws.accountId, 'business', 30)
+                                      }
+                                    >
+                                      Business 30d
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 text-[11px]"
+                                      disabled={updatingAccountId === ws.accountId}
+                                      onClick={() =>
+                                        handleAdminPlanChange(ws.accountId, 'trial', 7)
+                                      }
+                                    >
+                                      Trial 7d
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   ) : (
-                    'Reload'
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="border-b border-border text-muted-foreground">
+                          <tr>
+                            <th className="py-2 pr-3">User</th>
+                            <th className="py-2 pr-3">Email</th>
+                            <th className="py-2 pr-3">Role</th>
+                            <th className="py-2 pr-3">Workspace &amp; Plan</th>
+                            <th className="py-2 pr-3">WhatsApp</th>
+                            <th className="py-2">Joined</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/60">
+                          {filteredUsers.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="py-4 text-center text-muted-foreground">
+                                No matching users found.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredUsers.map((u) => (
+                              <tr key={u.userId}>
+                                <td className="py-2.5 pr-3">
+                                  <div className="flex items-center gap-1.5 font-medium">
+                                    <span>{u.fullName || '—'}</span>
+                                    {u.isSuperAdmin && (
+                                      <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">
+                                        Super Admin
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-2.5 pr-3 text-muted-foreground">{u.email}</td>
+                                <td className="py-2.5 pr-3 capitalize">{u.role}</td>
+                                <td className="py-2.5 pr-3">
+                                  <span className="font-medium">{u.workspaceName}</span>
+                                  <span className="ml-1.5 text-[11px] text-muted-foreground capitalize">
+                                    ({u.planId})
+                                  </span>
+                                </td>
+                                <td className="py-2.5 pr-3">
+                                  <span
+                                    className={
+                                      u.whatsappConnected
+                                        ? 'rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-400'
+                                        : 'rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground'
+                                    }
+                                  >
+                                    {u.whatsappConnected ? 'Connected' : 'Not connected'}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 text-muted-foreground">
+                                  {new Date(u.createdAt).toLocaleDateString()}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="border-b border-border text-muted-foreground">
-                      <tr>
-                        <th className="py-2 pr-3">Workspace</th>
-                        <th className="py-2 pr-3">Owner Email</th>
-                        <th className="py-2 pr-3">Plan / Status</th>
-                        <th className="py-2 pr-3">Days Left</th>
-                        <th className="py-2">Quick Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60">
-                      {workspaces.map((ws) => (
-                        <tr key={ws.accountId}>
-                          <td className="py-2.5 pr-3 font-medium">
-                            {ws.accountName}
-                          </td>
-                          <td className="py-2.5 pr-3 text-muted-foreground">
-                            {ws.ownerEmail}
-                          </td>
-                          <td className="py-2.5 pr-3 capitalize">
-                            {ws.effective.planId} ({ws.effective.status})
-                          </td>
-                          <td className="py-2.5 pr-3">
-                            {ws.effective.isSuperAdmin
-                              ? 'Unlimited'
-                              : ws.effective.daysRemaining}
-                          </td>
-                          <td className="py-2.5">
-                            <div className="flex flex-wrap gap-1.5">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-2 text-[11px]"
-                                disabled={updatingAccountId === ws.accountId}
-                                onClick={() =>
-                                  handleAdminPlanChange(ws.accountId, 'growth', 30)
-                                }
-                              >
-                                Growth 30d
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-2 text-[11px]"
-                                disabled={updatingAccountId === ws.accountId}
-                                onClick={() =>
-                                  handleAdminPlanChange(ws.accountId, 'business', 30)
-                                }
-                              >
-                                Business 30d
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-2 text-[11px]"
-                                disabled={updatingAccountId === ws.accountId}
-                                onClick={() =>
-                                  handleAdminPlanChange(ws.accountId, 'trial', 7)
-                                }
-                              >
-                                Trial 7d
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                </CardContent>
+              </Card>
+            );
+          })()}
         </>
       )}
     </div>
