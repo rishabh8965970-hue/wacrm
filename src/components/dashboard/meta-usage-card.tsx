@@ -132,7 +132,7 @@ export function MetaUsageCard({ range = 7 }: { range?: number }) {
 
       toast.success(
         mode === 'recharge'
-          ? 'Recharge added to Meta wallet tracker.'
+          ? 'Manual top-up logged in CRM wallet tracker.'
           : 'Meta wallet tracker updated.',
       );
       setMode(null);
@@ -425,10 +425,19 @@ export function MetaUsageCard({ range = 7 }: { range?: number }) {
 
                 {canEditSettings && (
                   <div className="flex flex-wrap items-center gap-1.5">
+                    <a
+                      href="https://business.facebook.com/latest/billing_hub/accounts"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(buttonVariants({ variant: 'default', size: 'sm' }), 'h-7 px-2.5 text-xs')}
+                    >
+                      Add Funds in Meta
+                      <ExternalLink className="size-3" aria-hidden />
+                    </a>
                     <Button
                       type="button"
                       size="sm"
-                      variant={mode === 'sync' ? 'default' : 'outline'}
+                      variant={mode === 'sync' ? 'secondary' : 'outline'}
                       className="h-7 px-2.5 text-xs"
                       onClick={() => {
                         setMode(mode === 'sync' ? null : 'sync');
@@ -440,7 +449,7 @@ export function MetaUsageCard({ range = 7 }: { range?: number }) {
                     <Button
                       type="button"
                       size="sm"
-                      variant={mode === 'recharge' ? 'default' : 'outline'}
+                      variant={mode === 'recharge' ? 'secondary' : 'outline'}
                       className="h-7 px-2.5 text-xs"
                       onClick={() => {
                         setMode(mode === 'recharge' ? null : 'recharge');
@@ -448,12 +457,12 @@ export function MetaUsageCard({ range = 7 }: { range?: number }) {
                       }}
                     >
                       <Plus className="size-3" aria-hidden />
-                      Add Recharge
+                      Log Meta Top-up (Manual)
                     </Button>
                     <Button
                       type="button"
                       size="sm"
-                      variant={mode === 'custom' ? 'default' : 'ghost'}
+                      variant={mode === 'custom' ? 'secondary' : 'ghost'}
                       className="h-7 px-2.5 text-xs"
                       onClick={() => {
                         setMode(mode === 'custom' ? null : 'custom');
@@ -471,74 +480,81 @@ export function MetaUsageCard({ range = 7 }: { range?: number }) {
               {mode && canEditSettings && (
                 <form
                   onSubmit={handleSaveWallet}
-                  className="mt-3 grid grid-cols-1 gap-3 border-t border-border pt-3 sm:grid-cols-4 sm:items-end"
+                  className="mt-3 space-y-3 border-t border-border pt-3"
                 >
-                  <div className="space-y-1">
-                    <Label htmlFor="meta-wallet-amount" className="text-xs">
-                      {mode === 'sync'
-                        ? `Current Meta Balance (${currency})`
-                        : mode === 'recharge'
-                          ? `Top-up Added (${currency})`
-                          : `Total Funded (${currency})`}
-                    </Label>
-                    <Input
-                      id="meta-wallet-amount"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder={mode === 'sync' ? 'e.g. 494.90' : 'e.g. 500'}
-                      value={amountInput}
-                      onChange={(e) => setAmountInput(e.target.value)}
-                      required
-                      className="h-8 text-xs"
-                    />
-                  </div>
-
-                  {mode === 'custom' && (
+                  <p className="text-[11px] text-amber-500">
+                    Manual tracker only — this updates your CRM estimate without charging your bank
+                    or adding real funds to Meta. Complete real payments via Add Funds in Meta
+                    first.
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 sm:items-end">
                     <div className="space-y-1">
-                      <Label htmlFor="meta-wallet-date" className="text-xs">
-                        Funded From Date
+                      <Label htmlFor="meta-wallet-amount" className="text-xs">
+                        {mode === 'sync'
+                          ? `Current Meta Balance (${currency})`
+                          : mode === 'recharge'
+                            ? `Manual Top-up Amount (${currency})`
+                            : `Total Funded (${currency})`}
                       </Label>
                       <Input
-                        id="meta-wallet-date"
-                        type="date"
-                        value={dateInput}
-                        onChange={(e) => setDateInput(e.target.value)}
+                        id="meta-wallet-amount"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder={mode === 'sync' ? 'e.g. 494.90' : 'e.g. 500'}
+                        value={amountInput}
+                        onChange={(e) => setAmountInput(e.target.value)}
                         required
                         className="h-8 text-xs"
                       />
                     </div>
-                  )}
 
-                  <div className="space-y-1">
-                    <Label htmlFor="meta-wallet-threshold" className="text-xs">
-                      Low Balance Alert ({currency})
-                    </Label>
-                    <Input
-                      id="meta-wallet-threshold"
-                      type="number"
-                      step="1"
-                      min="0"
-                      value={thresholdInput}
-                      onChange={(e) => setThresholdInput(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
+                    {mode === 'custom' && (
+                      <div className="space-y-1">
+                        <Label htmlFor="meta-wallet-date" className="text-xs">
+                          Funded From Date
+                        </Label>
+                        <Input
+                          id="meta-wallet-date"
+                          type="date"
+                          value={dateInput}
+                          onChange={(e) => setDateInput(e.target.value)}
+                          required
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    )}
 
-                  <div className="flex items-center gap-2">
-                    <Button type="submit" size="sm" className="h-8 text-xs" disabled={savingWallet}>
-                      {savingWallet && <Loader2 className="size-3 animate-spin" aria-hidden />}
-                      Save
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 text-xs"
-                      onClick={() => setMode(null)}
-                    >
-                      Cancel
-                    </Button>
+                    <div className="space-y-1">
+                      <Label htmlFor="meta-wallet-threshold" className="text-xs">
+                        Low Balance Alert ({currency})
+                      </Label>
+                      <Input
+                        id="meta-wallet-threshold"
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={thresholdInput}
+                        onChange={(e) => setThresholdInput(e.target.value)}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button type="submit" size="sm" className="h-8 text-xs" disabled={savingWallet}>
+                        {savingWallet && <Loader2 className="size-3 animate-spin" aria-hidden />}
+                        Save
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 text-xs"
+                        onClick={() => setMode(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
                 </form>
               )}
@@ -548,4 +564,4 @@ export function MetaUsageCard({ range = 7 }: { range?: number }) {
       </CardContent>
     </Card>
   );
-                }
+                        }
