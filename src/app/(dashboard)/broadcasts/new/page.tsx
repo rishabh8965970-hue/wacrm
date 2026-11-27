@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
+import type { AudienceConfig } from '@/lib/broadcast-audience';
+import { BROADCAST_PREFILL_STORAGE_KEY } from '@/lib/contacts/date-range';
 import { MessageTemplate } from '@/types';
 import { Step1ChooseTemplate } from '@/components/broadcasts/step1-choose-template';
 import { Step2SelectAudience } from '@/components/broadcasts/step2-select-audience';
@@ -29,22 +31,26 @@ export default function NewBroadcastPage() {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [template, setTemplate] = useState<MessageTemplate | null>(null);
-  const [audience, setAudience] = useState<{
-    type: 'all' | 'tags' | 'custom_field' | 'csv';
-    tagIds?: string[];
-    customField?: {
-      fieldId: string;
-      operator: 'is' | 'is_not' | 'contains';
-      value: string;
-    };
-    csvContacts?: { phone: string; name?: string }[];
-    excludeTagIds?: string[];
-  }>({ type: 'all' });
+  const [audience, setAudience] = useState<AudienceConfig>({ type: 'all' });
   const [variables, setVariables] = useState<
     Record<string, { type: 'static' | 'field' | 'custom_field'; value: string }>
   >({});
   const [headerMediaUrl, setHeaderMediaUrl] = useState('');
   const [name, setName] = useState('');
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(BROADCAST_PREFILL_STORAGE_KEY);
+      if (!raw) return;
+      sessionStorage.removeItem(BROADCAST_PREFILL_STORAGE_KEY);
+      const parsed = JSON.parse(raw) as AudienceConfig;
+      if (parsed && typeof parsed.type === 'string') {
+        setAudience(parsed);
+      }
+    } catch {
+      // Ignore malformed prefill payload
+    }
+  }, []);
 
   async function handleSend() {
     if (!template) return;
@@ -53,13 +59,7 @@ export default function NewBroadcastPage() {
       const broadcastId = await createAndSendBroadcast({
         name,
         template,
-        audience: {
-          type: audience.type,
-          tagIds: audience.tagIds,
-          customField: audience.customField,
-          csvContacts: audience.csvContacts,
-          excludeTagIds: audience.excludeTagIds,
-        },
+        audience,
         variables,
         headerMediaUrl,
       });
@@ -108,10 +108,7 @@ export default function NewBroadcastPage() {
       template_name: template.name,
       template_language: template.language ?? 'en_US',
       template_variables: variables,
-      audience_filter: {
-        type: audience.type,
-        tagIds: audience.tagIds,
-      },
+      audience_filter: audience,
       status: 'draft',
       total_recipients: 0,
       sent_count: 0,
