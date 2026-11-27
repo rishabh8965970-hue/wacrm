@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag } from '@/types';
@@ -48,8 +49,18 @@ import {
   ChevronRight,
   SlidersHorizontal,
   Filter,
+  Calendar,
+  Radio,
   X,
 } from 'lucide-react';
+import {
+  BROADCAST_PREFILL_STORAGE_KEY,
+  buildPresetDateRange,
+  formatLocalDateInput,
+  localDateBoundsToIso,
+  type ContactDatePreset,
+} from '@/lib/contacts/date-range';
+import type { AudienceConfig } from '@/lib/broadcast-audience';
 import { ContactForm } from '@/components/contacts/contact-form';
 import { ContactDetailView } from '@/components/contacts/contact-detail-view';
 import { ImportModal } from '@/components/contacts/import-modal';
@@ -67,6 +78,7 @@ interface ContactWithTags extends Contact {
 export default function ContactsPage() {
   const t = useTranslations('Contacts.page');
   const tGate = useTranslations('GatedButton');
+  const router = useRouter();
   const supabase = createClient();
   const canEdit = useCan('send-messages');
   const canEditSettings = useCan('edit-settings');
@@ -78,6 +90,10 @@ export default function ContactsPage() {
   const [totalCount, setTotalCount] = useState(0);
   // Tag filter — contacts shown must have ANY of these tags (OR).
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [datePreset, setDatePreset] = useState<ContactDatePreset>('all');
+  const [customFrom, setCustomFrom] = useState(() => formatLocalDateInput(new Date()));
+  const [customTo, setCustomTo] = useState(() => formatLocalDateInput(new Date()));
+  const [onlyMetaAds, setOnlyMetaAds] = useState(false);
 
   // Modals
   const [formOpen, setFormOpen] = useState(false);
@@ -119,6 +135,24 @@ export default function ContactsPage() {
     }
   }, [supabase]);
 
+  const activeDateRange = useMemo(() => {
+    if (datePreset === 'all') return null;
+    if (datePreset === 'custom') {
+      const bounds = localDateBoundsToIso(customFrom, customTo);
+      if (!bounds) return null;
+      return {
+        preset: 'custom' as const,
+        fromDate: customFrom,
+        toDate: customTo,
+        ...bounds,
+      };
+    }
+    return {
+      preset: datePreset,
+      ...buildPresetDateRange(datePreset),
+    };
+  }, [datePreset, customFrom, customTo]);
+
   const fetchContacts = useCallback(async () => {
     const seq = ++fetchSeq.current;
     setLoading(true);
@@ -138,12 +172,15 @@ export default function ContactsPage() {
       // Tag filter active — resolve it server-side (join + distinct +
       // windowed total count + pagination) so a tag covering many
       // contacts can't silently truncate the result or overflow an IN
-      // clause. See migration 025_filter_contacts_by_tags.
+      // clause. See migration 025 & 062.
       const { data, error } = await supabase.rpc('filter_contacts_by_tags', {
         p_tag_ids: selectedTagIds,
         p_search: term || null,
         p_limit: PAGE_SIZE,
         p_offset: from,
+        p_from: activeDateRange?.fromIso ?? null,
+        p_to: activeDateRange?.toIso ?? null,
+        p_lead_source: onlyMetaAds ? 'meta_ad' : null,
       });
       if (seq !== fetchSeq.current) return; // superseded by a newer fetch
       if (error) {
@@ -164,6 +201,14 @@ export default function ContactsPage() {
       if (term) {
         const like = `%${term}%`;
         query = query.or(`name.ilike.${like},phone.ilike.${like},email.ilike.${like}`);
+      }
+      if (activeDateRange) {
+        query = query
+          .gte('created_at', activeDateRange.fromIso)
+          .lt('created_at', activeDateRange.toIso);
+      }
+      if (onlyMetaAds) {
+        query = query.eq('lead_source', 'meta_ad');
       }
 
       const { data, count: exactCount, error } = await query;
@@ -208,7 +253,7 @@ export default function ContactsPage() {
 
     setContacts(enriched);
     setLoading(false);
-  }, [supabase, page, search, selectedTagIds, tagsMap, t]);
+  }, [supabase, page, search, selectedTagIds, activeDateRange, onlyMetaAds, tagsMap, t]);
 
   // Load-once-on-mount-ish data fetches. Each setter inside runs
   // inside an async promise completion (Supabase await), not
@@ -324,7 +369,11 @@ export default function ContactsPage() {
   const allTags = Object.values(tagsMap).sort((a, b) =>
     a.name.localeCompare(b.name)
   );
-  const hasActiveFilters = search.trim().length > 0 || selectedTagIds.length > 0;
+  const hasActiveFilters =
+    search.trim().length > 0 ||
+    selectedTagIds.length > 0 ||
+    datePreset !== 'all' ||
+    onlyMetaAds;
 
   function toggleTagFilter(tagId: string) {
     setSelectedTagIds((prev) =>
@@ -338,6 +387,88 @@ export default function ContactsPage() {
   function clearTagFilters() {
     setSelectedTagIds([]);
     setPage(0);
+  }
+
+  function clearAllFilters() {
+    setSearch('');
+    setSelectedTagIds([]);
+    setDatePreset('all');
+    setOnlyMetaAds(false);
+    setPage(0);
+  }
+
+  function startBroadcastWithAudience(config: AudienceConfig) {
+    try {
+      sessionStorage.setItem(BROADCAST_PREFILL_STORAGE_KEY, JSON.stringify(config));
+      router.push('/broadcasts/new');
+    } catch {
+      toast.error('Could not launch broadcast wizard.');
+    }
+  }
+
+  async function handleBroadcastFiltered() {
+    if (totalCount === 0) return;
+    if (activeDateRange && selectedTagIds.length === 0 && !search.trim()) {
+      startBroadcastWithAudience({
+        type: 'date_range',
+        dateRange: { ...activeDateRange, onlyMetaAds },
+      });
+      return;
+    }
+    if (selectedTagIds.length > 0 && !activeDateRange && !onlyMetaAds && !search.trim()) {
+      startBroadcastWithAudience({
+        type: 'tags',
+        tagIds: selectedTagIds,
+      });
+      return;
+    }
+
+    const ids: string[] = [];
+    const term = search.trim();
+    if (selectedTagIds.length > 0) {
+      const { data, error } = await supabase.rpc('filter_contacts_by_tags', {
+        p_tag_ids: selectedTagIds,
+        p_search: term || null,
+        p_limit: 1000,
+        p_offset: 0,
+        p_from: activeDateRange?.fromIso ?? null,
+        p_to: activeDateRange?.toIso ?? null,
+        p_lead_source: onlyMetaAds ? 'meta_ad' : null,
+      });
+      if (error) {
+        toast.error(t('toastFailedLoad'));
+        return;
+      }
+      const rows = (data ?? []) as { contact: Contact }[];
+      rows.forEach((r) => ids.push(r.contact.id));
+    } else {
+      let query = supabase
+        .from('contacts')
+        .select('id')
+        .order('created_at', { ascending: false })
+        .limit(1000);
+      if (term) {
+        const like = `%${term}%`;
+        query = query.or(`name.ilike.${like},phone.ilike.${like},email.ilike.${like}`);
+      }
+      if (activeDateRange) {
+        query = query
+          .gte('created_at', activeDateRange.fromIso)
+          .lt('created_at', activeDateRange.toIso);
+      }
+      if (onlyMetaAds) {
+        query = query.eq('lead_source', 'meta_ad');
+      }
+      const { data, error } = await query;
+      if (error) {
+        toast.error(t('toastFailedLoad'));
+        return;
+      }
+      (data ?? []).forEach((r: { id: string }) => ids.push(r.id));
+    }
+
+    if (ids.length === 0) return;
+    startBroadcastWithAudience({ type: 'selected', contactIds: ids });
   }
 
   return (
@@ -461,6 +592,96 @@ export default function ContactsPage() {
               )}
             </PopoverContent>
           </Popover>
+
+          <Button
+            type="button"
+            variant={onlyMetaAds ? 'default' : 'outline'}
+            onClick={() => {
+              setOnlyMetaAds((prev) => !prev);
+              setPage(0);
+            }}
+            className="shrink-0"
+          >
+            Meta Ads Only
+          </Button>
+
+          {hasActiveFilters && totalCount > 0 && canEdit && (
+            <Button
+              type="button"
+              onClick={() => void handleBroadcastFiltered()}
+              className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Radio className="size-4" />
+              Broadcast All ({totalCount})
+            </Button>
+          )}
+        </div>
+
+        {/* Date range filter bar */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Calendar className="size-3.5" />
+            Lead Date:
+          </span>
+          {(
+            [
+              { id: 'all', label: 'All Dates' },
+              { id: 'today', label: 'Today' },
+              { id: 'yesterday', label: 'Yesterday' },
+              { id: '7d', label: 'Last 7 days' },
+              { id: 'custom', label: 'Custom Date' },
+            ] as const
+          ).map((item) => (
+            <Button
+              key={item.id}
+              type="button"
+              size="sm"
+              variant={datePreset === item.id ? 'default' : 'outline'}
+              onClick={() => {
+                setDatePreset(item.id);
+                setPage(0);
+              }}
+              className="h-7 px-2.5 text-xs"
+            >
+              {item.label}
+            </Button>
+          ))}
+
+          {datePreset === 'custom' && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => {
+                  setCustomFrom(e.target.value);
+                  setPage(0);
+                }}
+                aria-label="From date"
+                className="h-7 w-auto bg-card text-xs"
+              />
+              <span className="text-xs text-muted-foreground">to</span>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => {
+                  setCustomTo(e.target.value);
+                  setPage(0);
+                }}
+                aria-label="To date"
+                className="h-7 w-auto bg-card text-xs"
+              />
+            </div>
+          )}
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="text-xs text-muted-foreground hover:text-foreground px-1.5"
+            >
+              Reset all filters
+            </button>
+          )}
         </div>
 
         {/* Active tag-filter chips */}
@@ -515,6 +736,20 @@ export default function ContactsPage() {
               {t('clearSelection')}
             </Button>
             <GatedButton
+              size="sm"
+              canAct={canEdit}
+              gateReason={tGate('reasons.createBroadcasts')}
+              onClick={() =>
+                startBroadcastWithAudience({
+                  type: 'selected',
+                  contactIds: [...selected],
+                })
+              }
+            >
+              <Radio className="size-4" />
+              Send Broadcast ({selected.size})
+            </GatedButton>
+            <GatedButton
               variant="destructive"
               size="sm"
               canAct={canEdit}
@@ -547,7 +782,7 @@ export default function ContactsPage() {
               <TableHead className="text-muted-foreground hidden md:table-cell">{t('tableColumns.email')}</TableHead>
               <TableHead className="text-muted-foreground hidden lg:table-cell">{t('tableColumns.company')}</TableHead>
               <TableHead className="text-muted-foreground hidden md:table-cell">{t('tableColumns.tags')}</TableHead>
-              <TableHead className="text-muted-foreground hidden lg:table-cell">{t('tableColumns.createdAt')}</TableHead>
+              <TableHead className="text-muted-foreground hidden sm:table-cell">{t('tableColumns.createdAt')}</TableHead>
               <TableHead className="text-muted-foreground w-12" />
             </TableRow>
           </TableHeader>
@@ -602,7 +837,21 @@ export default function ContactsPage() {
                     />
                   </TableCell>
                   <TableCell className="text-foreground font-medium">
-                    {contact.name || <span className="text-muted-foreground italic">{t('unnamed')}</span>}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span>
+                        {contact.name || (
+                          <span className="text-muted-foreground italic">{t('unnamed')}</span>
+                        )}
+                      </span>
+                      {contact.lead_source === 'meta_ad' && (
+                        <span
+                          title={contact.ad_headline || 'Came via Meta Click-to-WhatsApp Ad'}
+                          className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-400"
+                        >
+                          Meta Ad
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground font-mono text-xs">
                     {contact.phone}
@@ -638,11 +887,13 @@ export default function ContactsPage() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-xs hidden lg:table-cell">
-                    {new Date(contact.created_at).toLocaleDateString('en-US', {
+                  <TableCell className="text-muted-foreground text-xs hidden sm:table-cell">
+                    {new Date(contact.created_at).toLocaleString('en-IN', {
                       month: 'short',
                       day: 'numeric',
                       year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
                     })}
                   </TableCell>
                   <TableCell>
