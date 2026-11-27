@@ -98,6 +98,15 @@ interface WhatsAppMessage {
   button?: { text?: string; payload?: string }
   /** Present when the customer swipe-replies to one of our messages. */
   context?: { id: string }
+  /** Present on the first inbound message from a Click-to-WhatsApp Ad. */
+  referral?: {
+    source_url?: string
+    source_id?: string
+    source_type?: string
+    headline?: string
+    body?: string
+    ctwa_clid?: string
+  }
 }
 
 /** One entry of a failed status's `errors` array, as Meta sends it. */
@@ -750,6 +759,14 @@ async function processMessage(
     receivedAt
   )
 
+  await recordInboundLeadAttribution({
+    accountId,
+    configOwnerUserId,
+    contactId: contactRecord.id,
+    receivedAt,
+    referral: message.referral,
+  })
+
   // Update conversation. The unread bump is done DB-side (migration 037's
   // bump_conversation_on_inbound) rather than as a read-modify-write of the
   // snapshot loaded above: two inbound messages for the same conversation
@@ -1386,4 +1403,75 @@ async function findOrCreateConversation(
   }
 
   return { conversation: newConv, created: true }
+}
+
+/**
+ * Stamps `last_inbound_at` on the contact and, when the inbound message
+ * arrived via a Click-to-WhatsApp Ad (`referral`), records the ad metadata
+ * and attaches a `Meta Ad` tag to the contact. Non-fatal by design so an
+ * attribution error never drops inbound message processing.
+ */
+async function recordInboundLeadAttribution(params: {
+  accountId: string
+  configOwnerUserId: string
+  contactId: string
+  receivedAt: string
+  referral?: WhatsAppMessage['referral']
+}) {
+  try {
+    const db = supabaseAdmin()
+    const isMetaAd = Boolean(params.referral?.source_type)
+    const updatePayload: Record<string, string | null> = {
+      last_inbound_at: params.receivedAt,
+    }
+    if (isMetaAd && params.referral) {
+      updatePayload.lead_source =
+        params.referral.source_type === 'ad'
+          ? 'meta_ad'
+          : (params.referral.source_type ?? 'meta_ad')
+      updatePayload.ad_source_id = params.referral.source_id ?? null
+      updatePayload.ad_headline = params.referral.headline ?? null
+      updatePayload.ad_source_url = params.referral.source_url ?? null
+    }
+
+    await db
+      .from('contacts')
+      .update(updatePayload)
+      .eq('id', params.contactId)
+
+    if (params.referral?.source_type !== 'ad') {
+      return
+    }
+
+    const { data: existingTag } = await db
+      .from('tags')
+      .select('id')
+      .eq('account_id', params.accountId)
+      .ilike('name', 'Meta Ad')
+      .limit(1)
+      .maybeSingle()
+
+    let tagId = existingTag?.id as string | undefined
+    if (!tagId) {
+      const { data: createdTag } = await db
+        .from('tags')
+        .insert({
+          account_id: params.accountId,
+          user_id: params.configOwnerUserId,
+          name: 'Meta Ad',
+          color: '#8b5cf6',
+        })
+        .select('id')
+        .maybeSingle()
+      tagId = createdTag?.id as string | undefined
+    }
+
+    if (tagId) {
+      await db
+        .from('contact_tags')
+        .insert({ contact_id: params.contactId, tag_id: tagId })
+    }
+  } catch (err) {
+    console.warn('[webhook] lead attribution skipped:', err)
+  }
 }
