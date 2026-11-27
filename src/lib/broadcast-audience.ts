@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { fetchAllInChunks, fetchAllPages } from '@/lib/supabase/paged-query';
+import type { ContactDateRangeFilter } from '@/lib/contacts/date-range';
 import type { Contact } from '@/types';
 
 export type CustomFieldOperator = 'is' | 'is_not' | 'contains';
@@ -11,7 +12,13 @@ export interface CustomFieldFilter {
   value: string;
 }
 
-export type AudienceType = 'all' | 'tags' | 'custom_field' | 'csv';
+export type AudienceType =
+  | 'all'
+  | 'tags'
+  | 'custom_field'
+  | 'csv'
+  | 'date_range'
+  | 'selected';
 
 export interface CsvAudienceRow {
   phone: string;
@@ -23,6 +30,8 @@ export interface AudienceConfig {
   tagIds?: string[];
   customField?: CustomFieldFilter;
   csvContacts?: CsvAudienceRow[];
+  dateRange?: ContactDateRangeFilter;
+  contactIds?: string[];
   excludeTagIds?: string[];
 }
 
@@ -93,6 +102,25 @@ export function fetchAllContacts(db: SupabaseClient): Promise<Contact[]> {
   );
 }
 
+export function fetchDateRangeContacts(
+  db: SupabaseClient,
+  dateRange: ContactDateRangeFilter,
+): Promise<Contact[]> {
+  return withContext('date range contacts', () =>
+    fetchAllPages<Contact>((from, to) => {
+      let query = db
+        .from('contacts')
+        .select('*')
+        .gte('created_at', dateRange.fromIso)
+        .lt('created_at', dateRange.toIso);
+      if (dateRange.onlyMetaAds) {
+        query = query.eq('lead_source', 'meta_ad');
+      }
+      return query.order('id').range(from, to);
+    }),
+  );
+}
+
 async function fetchExcludedIds(
   db: SupabaseClient,
   audience: AudienceConfig,
@@ -133,6 +161,15 @@ export async function resolveAudienceContacts(
   if (audience.type === 'all') {
     return (await fetchAllContacts(db)).filter(keep);
   }
+  if (audience.type === 'date_range') {
+    if (!audience.dateRange?.fromIso || !audience.dateRange?.toIso) return [];
+    return (await fetchDateRangeContacts(db, audience.dateRange)).filter(keep);
+  }
+  if (audience.type === 'selected') {
+    const wanted = (audience.contactIds ?? []).filter((id) => !excluded.has(id));
+    if (wanted.length === 0) return [];
+    return fetchContactsByIds(db, wanted);
+  }
   if (audience.type === 'csv') {
     if (!audience.csvContacts) return [];
     return (await resolveCsv(audience.csvContacts)).filter(keep);
@@ -155,6 +192,34 @@ export async function countAudience(
       : null;
   }
 
+  if (audience.type === 'selected') {
+    const ids = audience.contactIds ?? [];
+    if (ids.length === 0) return 0;
+    const excluded = await fetchExcludedIds(db, audience);
+    return ids.filter((id) => !excluded.has(id)).length;
+  }
+
+  if (audience.type === 'date_range') {
+    const dr = audience.dateRange;
+    if (!dr?.fromIso || !dr?.toIso) return null;
+    const excluded = await fetchExcludedIds(db, audience);
+    if (excluded.size === 0) {
+      let query = db
+        .from('contacts')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', dr.fromIso)
+        .lt('created_at', dr.toIso);
+      if (dr.onlyMetaAds) {
+        query = query.eq('lead_source', 'meta_ad');
+      }
+      const { count, error } = await query;
+      if (error) throw new Error(`Failed to count date range contacts: ${error.message}`);
+      return count ?? 0;
+    }
+    const matching = await fetchDateRangeContacts(db, dr);
+    return matching.filter((c) => !excluded.has(c.id)).length;
+  }
+
   if (audience.type === 'all') {
     const { count, error } = await db
       .from('contacts')
@@ -175,4 +240,4 @@ export async function countAudience(
   let size = 0;
   for (const id of ids) if (!excluded.has(id)) size++;
   return size;
-}
+              }
