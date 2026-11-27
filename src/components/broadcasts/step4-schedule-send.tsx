@@ -68,7 +68,11 @@ export function Step4ScheduleSend({
         ? t('scheduleSend.audienceTags')
         : audience.type === 'csv'
           ? t('scheduleSend.audienceCsv')
-          : t('scheduleSend.audienceField');
+          : audience.type === 'date_range'
+            ? `By Date (${audience.dateRange?.fromDate ?? ''} – ${audience.dateRange?.toDate ?? ''}${audience.dateRange?.onlyMetaAds ? ' · Meta Ads' : ''})`
+            : audience.type === 'selected'
+              ? `Selected Contacts (${audience.contactIds?.length ?? 0})`
+              : t('scheduleSend.audienceField');
 
   return (
     <div className="space-y-6">
